@@ -176,6 +176,8 @@ module Fastlane
                   end
                 end
               end
+            else
+              all_avd_launched = true
             end
           end
 
