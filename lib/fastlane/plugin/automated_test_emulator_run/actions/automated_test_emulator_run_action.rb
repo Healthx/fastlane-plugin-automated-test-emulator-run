@@ -36,9 +36,6 @@ module Fastlane
             end
           end
 
-          UI.message("avd_schemes")
-          UI.message(avd_schemes.to_json)
-
           # Reseting wait states
           all_avd_launched = false
           adb_launch_complete = false 
@@ -97,10 +94,12 @@ module Fastlane
               end
 
               # Launching AVDs
-              UI.message("Launching all AVDs at the same time.".yellow)
-              for i in 0...avd_controllers.length
-                Process.fork do
-                  Action.sh(avd_controllers[i].command_start_avd)
+              if params[:start]
+                UI.message("Launching all AVDs at the same time.".yellow)
+                for i in 0...avd_controllers.length
+                  Process.fork do
+                    Action.sh(avd_controllers[i].command_start_avd)
+                  end
                 end
               end
             end
@@ -496,6 +495,12 @@ module Fastlane
           FastlaneCore::ConfigItem.new(key: :run_tests,
                                        env_name: "EMULATOR_RUN_TESTS",
                                        description: "Controls whether the tests should be run (set to false if we're just booting for now)",
+                                       default_value: true,
+                                       is_string: false,
+                                       optional: true),
+          FastlaneCore::ConfigItem.new(key: :start,
+                                       env_name: "EMULATOR_START",
+                                       description: "Controls whether the emulator should be started",
                                        default_value: true,
                                        is_string: false,
                                        optional: true),
