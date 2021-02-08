@@ -204,15 +204,18 @@ module Fastlane
             ensure 
               # Clean up
               for i in 0...avd_schemes.length
-                # Kill all emulators
-                device = ["emulator-", avd_schemes[i].launch_avd_port].join("")
-                unless devices.match(device).nil?
-                  if params[:logcat]
-                    file = [device, '.log'].join('')
-                    cmd = [adb_controller.adb_path, '-s', device, 'logcat -d >', file].join(' ')
-                    Action.sh(cmd)
+
+                if params[:stop]
+                  # Kill all emulators
+                  device = ["emulator-", avd_schemes[i].launch_avd_port].join("")
+                  unless devices.match(device).nil?
+                    if params[:logcat]
+                      file = [device, '.log'].join('')
+                      cmd = [adb_controller.adb_path, '-s', device, 'logcat -d >', file].join(' ')
+                      Action.sh(cmd)
+                    end
+                    Action.sh(avd_controllers[i].command_kill_device)
                   end
-                  Action.sh(avd_controllers[i].command_kill_device)
                 end
 
                 if params[:verbose]
@@ -501,6 +504,12 @@ module Fastlane
           FastlaneCore::ConfigItem.new(key: :start,
                                        env_name: "EMULATOR_START",
                                        description: "Controls whether the emulator should be started",
+                                       default_value: true,
+                                       is_string: false,
+                                       optional: true),
+          FastlaneCore::ConfigItem.new(key: :stop,
+                                       env_name: "EMULATOR_STOP",
+                                       description: "Controls whether the emulator should be stopped",
                                        default_value: true,
                                        is_string: false,
                                        optional: true),
