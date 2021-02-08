@@ -37,7 +37,7 @@ module Fastlane
           end
 
           UI.message("avd_schemes")
-          UI.message(avc_schemes.to_json)
+          UI.message(avd_schemes.to_json)
 
           # Reseting wait states
           all_avd_launched = false
