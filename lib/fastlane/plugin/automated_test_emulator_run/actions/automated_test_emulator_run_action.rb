@@ -47,98 +47,91 @@ module Fastlane
             UI.message("Getting avaliable AVDs".yellow)
             devices = Action.sh(adb_controller.command_get_avds)
            
-            if params[:boot]
-
-              for i in 0...avd_schemes.length           
-                unless devices.match(avd_schemes[i].avd_name).nil?
-                  UI.message(["AVD with name '", avd_schemes[i].avd_name, "' currently exists."].join("").yellow)
-                  if params[:AVD_recreate_new]
-                    # Delete existing AVDs
-                    UI.message("AVD_create_new parameter set to true.".yellow)
-                    UI.message(["Deleting existing AVD with name:", avd_schemes[i].avd_name].join(" ").yellow)
-                    Action.sh(avd_controllers[i].command_delete_avd)
-                  
-                    # Re-create AVD
-                    UI.message(["Re-creating new AVD."].join(" ").yellow)
-                    Action.sh(avd_controllers[i].command_create_avd)
-                  else 
-                    # Use existing AVD
-                    UI.message("AVD_recreate_new parameter set to false.".yellow)
-                    UI.message("Using existing AVD for tests.".yellow)
-                  end
-                else 
-                  # Create AVD
-                  UI.message(["AVD with name '", avd_schemes[i].avd_name, "' does not exist. Creating new AVD."].join("").yellow)
+            for i in 0...avd_schemes.length           
+              unless devices.match(avd_schemes[i].avd_name).nil?
+                UI.message(["AVD with name '", avd_schemes[i].avd_name, "' currently exists."].join("").yellow)
+                if params[:AVD_recreate_new]
+                  # Delete existing AVDs
+                  UI.message("AVD_create_new parameter set to true.".yellow)
+                  UI.message(["Deleting existing AVD with name:", avd_schemes[i].avd_name].join(" ").yellow)
+                  Action.sh(avd_controllers[i].command_delete_avd)
+                
+                  # Re-create AVD
+                  UI.message(["Re-creating new AVD."].join(" ").yellow)
                   Action.sh(avd_controllers[i].command_create_avd)
+                else 
+                  # Use existing AVD
+                  UI.message("AVD_recreate_new parameter set to false.".yellow)
+                  UI.message("Using existing AVD for tests.".yellow)
                 end
+              else 
+                # Create AVD
+                UI.message(["AVD with name '", avd_schemes[i].avd_name, "' does not exist. Creating new AVD."].join("").yellow)
+                Action.sh(avd_controllers[i].command_create_avd)
               end
+            end
 
-              # Restart ADB
-              if params[:ADB_restart]
-                UI.message("Restarting adb".yellow)
-                Action.sh(adb_controller.command_stop)
-                Action.sh(adb_controller.command_start)
+            # Restart ADB
+            if params[:ADB_restart]
+              UI.message("Restarting adb".yellow)
+              Action.sh(adb_controller.command_stop)
+              Action.sh(adb_controller.command_start)
+            else
+              UI.message("ADB won't be restarted. 'ADB_restart' set to false.".yellow)
+            end
+
+            # Applying custom configs (it's not done directly after create because 'cat' operation seems to fail overwrite)
+            for i in 0...avd_schemes.length
+              UI.message(["Attemting to apply custom config to ", avd_schemes[i].avd_name].join("").yellow)
+              if avd_controllers[i].command_apply_config_avd.eql? "" 
+                UI.message(["No config file found for AVD '", avd_schemes[i].avd_name, "'. AVD won't have config.ini applied."].join("").yellow)
               else
-                UI.message("ADB won't be restarted. 'ADB_restart' set to false.".yellow)
+                UI.message(["Config file found! Applying custom config to: ", avd_schemes[i].avd_name].join("").yellow)
+                Action.sh(avd_controllers[i].command_apply_config_avd)
               end
+            end
 
-              # Applying custom configs (it's not done directly after create because 'cat' operation seems to fail overwrite)
-              for i in 0...avd_schemes.length
-                UI.message(["Attemting to apply custom config to ", avd_schemes[i].avd_name].join("").yellow)
-                if avd_controllers[i].command_apply_config_avd.eql? "" 
-                  UI.message(["No config file found for AVD '", avd_schemes[i].avd_name, "'. AVD won't have config.ini applied."].join("").yellow)
-                else
-                  UI.message(["Config file found! Applying custom config to: ", avd_schemes[i].avd_name].join("").yellow)
-                  Action.sh(avd_controllers[i].command_apply_config_avd)
-                end
-              end
-
-              # Launching AVDs
-              if params[:start]
-                UI.message("Launching all AVDs at the same time.".yellow)
-                for i in 0...avd_controllers.length
-                  Process.fork do
-                    Action.sh(avd_controllers[i].command_start_avd)
-                  end
+            # Launching AVDs
+            if params[:start]
+              UI.message("Launching all AVDs at the same time.".yellow)
+              for i in 0...avd_controllers.length
+                Process.fork do
+                  Action.sh(avd_controllers[i].command_start_avd)
                 end
               end
             end
 
-            if params[:run_tests]
-              # Wait for AVDs finish booting
-              UI.message("Waiting for AVDs to finish booting.".yellow)
-              UI.message("Performing wait for ADB boot".yellow)
-              adb_launch_complete = wait_for_emulator_boot_by_adb(adb_controller, avd_schemes, "#{params[:AVD_adb_launch_timeout]}")
+            # Wait for AVDs finish booting
+            UI.message("Waiting for AVDs to finish booting.".yellow)
+            UI.message("Performing wait for ADB boot".yellow)
+            adb_launch_complete = wait_for_emulator_boot_by_adb(adb_controller, avd_schemes, "#{params[:AVD_adb_launch_timeout]}")
 
-              # Wait for AVD params finish booting
-              if adb_launch_complete
-                UI.message("Wait for ADB boot completed with success".yellow)
+            # Wait for AVD params finish booting
+            if adb_launch_complete
+              UI.message("Wait for ADB boot completed with success".yellow)
 
-                if (params[:AVD_wait_for_bootcomplete] || params[:AVD_wait_for_boot_completed] || params[:AVD_wait_for_bootanim])
-                  message = "Performing wait for params: "
-                  
-                  if params[:AVD_wait_for_bootcomplete]
-                    message += "'dev.bootcomplete', "
-                  end
+              if (params[:AVD_wait_for_bootcomplete] || params[:AVD_wait_for_boot_completed] || params[:AVD_wait_for_bootanim])
+                message = "Performing wait for params: "
                 
-                  if params[:AVD_wait_for_boot_completed]
-                    message += "'sys.boot_completed', "
-                  end
-                
-                  if params[:AVD_wait_for_bootanim]
-                    message += "'init.svc.bootanim', "
-                  end
-                
-                  message = message[0...-2] + "."
-                  UI.message(message.yellow)
-
-                  param_launch_complete = wait_for_emulator_boot_by_params(params, adb_controller, avd_controllers, avd_schemes, "#{params[:AVD_param_launch_timeout]}")
-                else
-                  UI.message("Wait for AVD launch params was turned off. Skipping...".yellow)
-                  param_launch_complete = true
+                if params[:AVD_wait_for_bootcomplete]
+                  message += "'dev.bootcomplete', "
                 end
-              else 
-                UI.message("Wait for ADB boot failed".yellow)
+              
+                if params[:AVD_wait_for_boot_completed]
+                  message += "'sys.boot_completed', "
+                end
+              
+                if params[:AVD_wait_for_bootanim]
+                  message += "'init.svc.bootanim', "
+                end
+              
+                message = message[0...-2] + "."
+                UI.message(message.yellow)
+
+                param_launch_complete = wait_for_emulator_boot_by_params(params, adb_controller, avd_controllers, avd_schemes, "#{params[:AVD_param_launch_timeout]}")
+              else
+                UI.message("Wait for AVD launch params was turned off. Skipping...".yellow)
+                param_launch_complete = true
               end
 
               all_avd_launched = adb_launch_complete && param_launch_complete
@@ -183,60 +176,58 @@ module Fastlane
             end
           end
 
-          if params[:run_tests]
-            # Launching tests
-            shell_task = "#{params[:shell_task]}" unless params[:shell_task].nil?
-            gradle_task = "#{params[:gradle_task]}" unless params[:gradle_task].nil?
+          # Launching tests
+          shell_task = "#{params[:shell_task]}" unless params[:shell_task].nil?
+          gradle_task = "#{params[:gradle_task]}" unless params[:gradle_task].nil?
 
-            UI.message("Starting tests".green)
-            begin
-              unless shell_task.nil?
-                UI.message("Using shell task.".green)
-                Action.sh(shell_task)
+          UI.message("Starting tests".green)
+          begin
+            unless shell_task.nil?
+              UI.message("Using shell task.".green)
+              Action.sh(shell_task)
+            end
+
+            unless gradle_task.nil?
+              gradle = Helper::GradleHelper.new(gradle_path: Dir["./gradlew"].last)
+
+              UI.message("Using gradle task.".green)
+              gradle.trigger(task: params[:gradle_task], flags: params[:gradle_flags], serial: nil)
+            end
+          ensure 
+            # Clean up
+            for i in 0...avd_schemes.length
+
+              if params[:stop]
+                # Kill all emulators
+                device = ["emulator-", avd_schemes[i].launch_avd_port].join("")
+                unless devices.match(device).nil?
+                  if params[:logcat]
+                    file = [device, '.log'].join('')
+                    cmd = [adb_controller.adb_path, '-s', device, 'logcat -d >', file].join(' ')
+                    Action.sh(cmd)
+                  end
+                  Action.sh(avd_controllers[i].command_kill_device)
+                end
               end
 
-              unless gradle_task.nil?
-                gradle = Helper::GradleHelper.new(gradle_path: Dir["./gradlew"].last)
+              if params[:verbose]
+                # Display AVD output
+                if (File.exists?(avd_controllers[i].output_file.path))
+                  UI.message("Displaying log from AVD to console:".green)
+                  UI.message(avd_controllers[i].output_file.read.blue)
 
-                UI.message("Using gradle task.".green)
-                gradle.trigger(task: params[:gradle_task], flags: params[:gradle_flags], serial: nil)
+                  UI.message("Removing temp file.".green)
+                  avd_controllers[i].output_file.close
+                  avd_controllers[i].output_file.unlink
+                end
               end
-            ensure 
-              # Clean up
-              for i in 0...avd_schemes.length
 
-                if params[:stop]
-                  # Kill all emulators
-                  device = ["emulator-", avd_schemes[i].launch_avd_port].join("")
-                  unless devices.match(device).nil?
-                    if params[:logcat]
-                      file = [device, '.log'].join('')
-                      cmd = [adb_controller.adb_path, '-s', device, 'logcat -d >', file].join(' ')
-                      Action.sh(cmd)
-                    end
-                    Action.sh(avd_controllers[i].command_kill_device)
-                  end
-                end
-
-                if params[:verbose]
-                  # Display AVD output
-                  if (File.exists?(avd_controllers[i].output_file.path))
-                    UI.message("Displaying log from AVD to console:".green)
-                    UI.message(avd_controllers[i].output_file.read.blue)
-
-                    UI.message("Removing temp file.".green)
-                    avd_controllers[i].output_file.close
-                    avd_controllers[i].output_file.unlink
-                  end
-                end
-
-                # Delete AVDs
-                if params[:AVD_clean_after]
-                  UI.message("AVD_clean_after param set to true. Deleting AVDs.".green)
-                  Action.sh(avd_controllers[i].command_delete_avd)
-                else
-                  UI.message("AVD_clean_after param set to false. Created AVDs won't be deleted.".green)
-                end
+              # Delete AVDs
+              if params[:AVD_clean_after]
+                UI.message("AVD_clean_after param set to true. Deleting AVDs.".green)
+                Action.sh(avd_controllers[i].command_delete_avd)
+              else
+                UI.message("AVD_clean_after param set to false. Created AVDs won't be deleted.".green)
               end
             end
           end
@@ -487,18 +478,6 @@ module Fastlane
                                        env_name: "ADB_LOGCAT",
                                        description: "Allows to turn logcat on/off so you can debug crashes and such",
                                        default_value: false,
-                                       is_string: false,
-                                       optional: true),
-          FastlaneCore::ConfigItem.new(key: :boot,
-                                       env_name: "EMULATOR_BOOT",
-                                       description: "Controls whether the emulator should be created and started (set to false if it already is)",
-                                       default_value: true,
-                                       is_string: false,
-                                       optional: true),
-          FastlaneCore::ConfigItem.new(key: :run_tests,
-                                       env_name: "EMULATOR_RUN_TESTS",
-                                       description: "Controls whether the tests should be run (set to false if we're just booting for now)",
-                                       default_value: true,
                                        is_string: false,
                                        optional: true),
           FastlaneCore::ConfigItem.new(key: :start,
