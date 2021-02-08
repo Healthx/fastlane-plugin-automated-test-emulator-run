@@ -36,6 +36,9 @@ module Fastlane
             end
           end
 
+          UI.message("avd_schemes")
+          UI.message(avc_schemes.to_json)
+
           # Reseting wait states
           all_avd_launched = false
           adb_launch_complete = false 
